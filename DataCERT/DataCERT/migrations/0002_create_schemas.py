@@ -2,7 +2,7 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('your_app_name', '0001_initial'),
+        ('DataCERT', '0001_initial'),  # Updated from 'your_app_name' to 'DataCERT'
     ]
 
     def create_schemas(apps, schema_editor):

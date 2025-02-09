@@ -16,7 +16,12 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path
+from .views import CSVUploadView, ValidationView, ValidationReportView, MoveToValidatedView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('upload/', CSVUploadView.as_view(), name='csv_upload'),
+    path('validate/', ValidationView.as_view(), name='validate'),
+    path('validation-report/<int:report_id>/', ValidationReportView.as_view(), name='validation_report'),
+    path('move-to-validated/<int:report_id>/', MoveToValidatedView.as_view(), name='move_to_validated')
 ]

@@ -1,20 +1,22 @@
-from django.shortcuts import render, redirect, get_object_or_404, get_list_or_404
+from django.shortcuts import render, redirect
 from django.views import View
 from django.views.generic import DetailView
 from django.contrib import messages
-from .utils.validators.base import BaseValidator
+from django.core.files.storage import FileSystemStorage
+from django.shortcuts import get_object_or_404
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.db.models import Count
-from django.core.files.storage import FileSystemStorage
+
 from .forms import CSVUploadForm, ValidationForm
-from .models import DataFile, ValidationError, ValidationReport
+from .models import DataFile, ValidationReport, ValidationError
 from .utils.csv_processor import CSVProcessor
 from .utils.validators.default import DefaultValidator
+from .utils.validators.base import BaseValidator
 from .utils.data_mover import DataMover
+
 import importlib.util
 import sys
 from io import StringIO
-import os
 
 class CSVUploadView(View):
     template_name = 'upload.html'
@@ -26,23 +28,23 @@ class CSVUploadView(View):
     def post(self, request):
         form = CSVUploadForm(request.POST, request.FILES)
         if form.is_valid():
-            # Create a temporary storage for the file
-            fs = FileSystemStorage()
-            
-            # Get the uploaded file
-            file = request.FILES['file']
-            
-            # Save the file to disk
-            filename = fs.save(f'csv_uploads/{file.name}', file)
-            
-            # Create DataFile record
-            data_file = DataFile.objects.create(
-                file_name=file.name,
-                status='uploaded',
-            )
-            
-            # Process the file
             try:
+                # Create a temporary storage for the file
+                fs = FileSystemStorage()
+                
+                # Get the uploaded file
+                file = request.FILES['file']
+                
+                # Save the file to disk
+                filename = fs.save(f'csv_uploads/{file.name}', file)
+                
+                # Create DataFile record
+                data_file = DataFile.objects.create(
+                    file_name=file.name,
+                    status='uploaded',
+                )
+                
+                # Process the file
                 processor = CSVProcessor(fs.path(filename))
                 result = processor.process_file()
                 
@@ -55,6 +57,7 @@ class CSVUploadView(View):
                         request,
                         f'File processed successfully. {result["processed_rows"]} rows imported.'
                     )
+                    return redirect('validate')
                 else:
                     data_file.status = 'failed'
                     data_file.save()
@@ -63,13 +66,13 @@ class CSVUploadView(View):
                         f'Error processing file: {result.get("error", "Unknown error")}'
                     )
             except Exception as e:
-                data_file.status = 'failed'
-                data_file.save()
+                if 'data_file' in locals():
+                    data_file.status = 'failed'
+                    data_file.save()
                 messages.error(request, f'Error processing file: {str(e)}')
-            return redirect('file_list')  # We'll create this view later
             
         return render(request, self.template_name, {'form': form})
-    
+
 class ValidationView(View):
     template_name = 'validate.html'
     
@@ -134,7 +137,7 @@ class ValidationView(View):
 from typing import Dict, Any
 import pandas as pd
 import numpy as np
-from app.utils.validators.base import BaseValidator
+from DataCERT.utils.validators.base import BaseValidator
 
 {code}
         """

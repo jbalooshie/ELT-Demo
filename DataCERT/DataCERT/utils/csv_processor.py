@@ -5,8 +5,65 @@ from django.db import connection
 import logging
 from typing import List, Dict, Any
 import os
+import chardet
 
 logger = logging.getLogger(__name__)
+
+class CSVProcessor:
+    def __init__(self, file_path: str, chunk_size: int = 10000):
+        """
+        Initialize the CSV processor
+        
+        Args:
+            file_path: Path to the CSV file
+            chunk_size: Number of rows to process at once
+        """
+        self.file_path = file_path
+        self.chunk_size = chunk_size
+        self.total_rows = 0
+        self.processed_rows = 0
+        self.schema_name = settings.DATABASE_SCHEMAS['RAW']
+        
+    def _detect_encoding(self) -> str:
+        """Detect the file encoding"""
+        with open(self.file_path, 'rb') as file:
+            raw_data = file.read()
+            result = chardet.detect(raw_data)
+            return result['encoding'] or 'utf-8'
+    
+    def _read_csv_with_encoding(self) -> pd.DataFrame:
+        """Try to read CSV with detected encoding"""
+        try:
+            encoding = self._detect_encoding()
+            logger.info(f"Detected encoding: {encoding}")
+            
+            return pd.read_csv(
+                self.file_path,
+                encoding=encoding,
+                sep=None,  # Let pandas detect the separator
+                engine='python',  # More flexible but slower engine
+                encoding_errors='replace'  # Replace invalid characters
+            )
+        except Exception as e:
+            logger.error(f"Error reading CSV with detected encoding: {str(e)}")
+            # Fallback to common encodings
+            encodings = ['utf-8', 'latin1', 'iso-8859-1', 'cp1252']
+            
+            for enc in encodings:
+                try:
+                    logger.info(f"Trying encoding: {enc}")
+                    return pd.read_csv(
+                        self.file_path,
+                        encoding=enc,
+                        sep=None,
+                        engine='python',
+                        encoding_errors='replace'
+                    )
+                except Exception as e:
+                    logger.error(f"Failed with encoding {enc}: {str(e)}")
+                    continue
+            
+            raise ValueError("Unable to read CSV file with any supported encoding")
 
 class CSVProcessor:
     def __init__(self, file_path: str, chunk_size: int = 10000):
